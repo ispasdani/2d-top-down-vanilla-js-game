@@ -55,7 +55,6 @@ const layersData = {
   l_Small_Fruit_Tree: l_Small_Fruit_Tree,
   l_Spruce_Tree_Small: l_Spruce_Tree_Small,
   l_Fountain: l_Fountain,
-  l_Outdoor_Decor_2: l_Outdoor_Decor_2,
   l_Oak_Tree: l_Oak_Tree,
   l_Oak_Tree_Small: l_Oak_Tree_Small,
   l_Golden_Chest_Anim: l_Golden_Chest_Anim,
@@ -123,7 +122,6 @@ const tilesets = {
     tileSize: 16,
   },
   l_Fountain: { imageUrl: "./images/Fountain.png", tileSize: 16 },
-  l_Outdoor_Decor_2: { imageUrl: "./images/Outdoor_Decor_2.png", tileSize: 16 },
   l_Oak_Tree: { imageUrl: "./images/Oak_Tree.png", tileSize: 16 },
   l_Oak_Tree_Small: { imageUrl: "./images/Oak_Tree_Small.png", tileSize: 16 },
   l_Golden_Chest_Anim: {
@@ -257,8 +255,36 @@ const monsters = [
     sprites: monstersSprites,
   }),
   new Monster({
+    x: 80,
+    y: 304,
+    size: 15,
+    imageSrc: "./images/bamboo.png",
+    sprites: monstersSprites,
+  }),
+  new Monster({
+    x: 64,
+    y: 512,
+    size: 15,
+    imageSrc: "./images/bamboo.png",
+    sprites: monstersSprites,
+  }),
+  new Monster({
     x: 144,
     y: 440,
+    size: 15,
+    imageSrc: "./images/dragon.png",
+    sprites: monstersSprites,
+  }),
+  new Monster({
+    x: 48,
+    y: 272,
+    size: 15,
+    imageSrc: "./images/dragon.png",
+    sprites: monstersSprites,
+  }),
+  new Monster({
+    x: 144,
+    y: 608,
     size: 15,
     imageSrc: "./images/dragon.png",
     sprites: monstersSprites,
@@ -282,11 +308,55 @@ const keys = {
 
 let lastTime = performance.now();
 let frontRendersCanvas;
+
+const hearts = [
+  new Heart({
+    x: 10,
+    y: 10,
+  }),
+  new Heart({
+    x: 32,
+    y: 10,
+  }),
+  new Heart({
+    x: 54,
+    y: 10,
+  }),
+];
+
+const leafs = [
+  new Sprite({
+    x: 128,
+    y: 496,
+    velocity: {
+      x: 0.08,
+      y: 0.08,
+    },
+  }),
+];
+
+let elapsedTime = 0;
+
 function animate(backgroundCanvas) {
   // Calculate delta time
   const currentTime = performance.now();
   const deltaTime = (currentTime - lastTime) / 1000;
   lastTime = currentTime;
+  elapsedTime += deltaTime;
+
+  if (elapsedTime > 1.5) {
+    leafs.push(
+      new Sprite({
+        x: Math.random() * 150,
+        y: Math.random() * 600,
+        velocity: {
+          x: 0.08,
+          y: 0.08,
+        },
+      })
+    );
+    elapsedTime = 0;
+  }
 
   // Update player position
   player.handleInput(keys);
@@ -315,9 +385,65 @@ function animate(backgroundCanvas) {
     const monster = monsters[i];
     monster.update(deltaTime, collisionBlocks);
     monster.draw(c);
+
+    // Detect for collision
+    if (
+      player.attackBox.x + player.attackBox.width >= monster.x &&
+      player.attackBox.x <= monster.x + monster.width &&
+      player.attackBox.y + player.attackBox.height >= monster.y &&
+      player.attackBox.y <= monster.y + monster.height &&
+      player.isAttacking &&
+      !player.hasHitEnemy
+    ) {
+      monster.receiveHit();
+      player.hasHitEnemy = true;
+
+      if (monster.health <= 0) {
+        monsters.splice(i, 1);
+      }
+    }
+
+    // Collision for player getting hit
+    if (
+      player.x + player.width >= monster.x &&
+      player.x <= monster.x + monster.width &&
+      player.y + player.height >= monster.y &&
+      player.y <= monster.y + monster.height &&
+      !player.isInvincible
+    ) {
+      player.receiveHit();
+
+      const filledHearts = hearts.filter((heart) => heart.currentFrame === 4);
+
+      if (filledHearts.length > 0) {
+        filledHearts[filledHearts.length - 1].currentFrame = 0;
+      }
+
+      if (filledHearts.length <= 1) {
+        console.log("game over");
+      }
+    }
   }
 
   // c.drawImage(frontRendersCanvas, 0, 0);
+
+  for (let i = leafs.length - 1; i >= 0; i--) {
+    const leaf = leafs[i];
+    leaf.update(deltaTime);
+    leaf.draw(c);
+
+    if (leaf.alpha <= 0) {
+      leafs.splice(i, 1);
+    }
+  }
+
+  c.restore();
+
+  c.save();
+  c.scale(MAP_SCALE, MAP_SCALE);
+  hearts.forEach((heart) => {
+    heart.draw(c);
+  });
   c.restore();
 
   requestAnimationFrame(() => animate(backgroundCanvas));

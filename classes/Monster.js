@@ -1,7 +1,19 @@
 class Monster {
-  constructor({ x, y, size, velocity = { x: 0, y: 0 }, imageSrc, sprites }) {
+  constructor({
+    x,
+    y,
+    size,
+    velocity = { x: 0, y: 0 },
+    imageSrc,
+    sprites,
+    health = 3,
+  }) {
     this.x = x;
     this.y = y;
+    this.originalPosition = {
+      x: x,
+      y: y,
+    };
     this.width = size;
     this.height = size;
     this.velocity = velocity;
@@ -51,6 +63,17 @@ class Monster {
     // };
     // this.currentSprite = this.sprites.walkDown;
     this.currentSprite = Object.values(this.sprites)[0];
+    this.health = health;
+    this.isInvincible = false;
+    this.elapsedInvincibilityTime = 0;
+    this.invincibilityInterval = 0.3;
+  }
+
+  receiveHit() {
+    if (this.isInvincible) return;
+
+    this.health--;
+    this.isInvincible = true;
   }
 
   draw(c) {
@@ -59,7 +82,12 @@ class Monster {
     // Red square debug code
     // c.fillStyle = "rgba(0, 0, 255, 0.5)";
     // c.fillRect(this.x, this.y, this.width, this.height);
-
+    let alpha = 1;
+    if (this.isInvincible) {
+      alpha = 0.5;
+    }
+    c.save();
+    c.globalAlpha = alpha;
     c.drawImage(
       this.image,
       this.currentSprite.x,
@@ -71,12 +99,22 @@ class Monster {
       this.width,
       this.height
     );
+    c.restore();
   }
 
   update(deltaTime, collisionBlocks) {
     if (!deltaTime) return;
 
     this.elapsedTime += deltaTime;
+
+    if (this.isInvincible) {
+      this.elapsedInvincibilityTime += deltaTime;
+
+      if (this.elapsedInvincibilityTime >= this.invincibilityInterval) {
+        this.isInvincible = false;
+        this.elapsedInvincibilityTime = 0;
+      }
+    }
 
     const intervalToGoToNextFrame = 0.15;
 
@@ -104,11 +142,33 @@ class Monster {
   }
 
   setVelocity(deltaTime) {
-    this.elapsedMovementTime += deltaTime;
-    if (this.elapsedMovementTime > 3) {
-      console.log("Call this code");
-      this.elapsedMovementTime -= 3;
+    const changeDirectionInterval = 2;
+    if (
+      this.elapsedMovementTime > changeDirectionInterval ||
+      this.elapsedMovementTime === 0
+    ) {
+      this.elapsedMovementTime -= changeDirectionInterval;
+
+      const angle = Math.random() * Math.PI * 2;
+      const CIRCLE_RADIUS = 20;
+
+      const targetLocation = {
+        x: this.originalPosition.x + Math.cos(angle) * CIRCLE_RADIUS,
+        y: this.originalPosition.y + Math.sin(angle) * CIRCLE_RADIUS,
+      };
+
+      const deltaX = targetLocation.x - this.x;
+      const deltaY = targetLocation.y - this.y;
+
+      const hypotenuse = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      const normalizedDeltaX = deltaX / hypotenuse;
+      const normalizedDeltaY = deltaY / hypotenuse;
+
+      this.velocity.x = normalizedDeltaX * CIRCLE_RADIUS;
+      this.velocity.y = normalizedDeltaY * CIRCLE_RADIUS;
     }
+
+    this.elapsedMovementTime += deltaTime;
   }
 
   updateHorizontalPosition(deltaTime) {
@@ -134,13 +194,14 @@ class Monster {
         // Check collision while player is going left
         if (this.velocity.x < -0) {
           this.x = collisionBlock.x + collisionBlock.width + buffer;
+          this.velocity.x = -this.velocity.x;
           break;
         }
 
         // Check collision while player is going right
         if (this.velocity.x > 0) {
           this.x = collisionBlock.x - this.width - buffer;
-
+          this.velocity.x = -this.velocity.x;
           break;
         }
       }
@@ -161,8 +222,8 @@ class Monster {
       ) {
         // Check collision while player is going up
         if (this.velocity.y < 0) {
-          this.velocity.y = 0;
           this.y = collisionBlock.y + collisionBlock.height + buffer;
+          this.velocity.y = -this.velocity.y;
           break;
         }
 
@@ -170,6 +231,8 @@ class Monster {
         if (this.velocity.y > 0) {
           this.velocity.y = 0;
           this.y = collisionBlock.y - this.height - buffer;
+          this.velocity.y = -this.velocity.y;
+
           break;
         }
       }
